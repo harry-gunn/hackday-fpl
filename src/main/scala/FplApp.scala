@@ -10,21 +10,43 @@ object FplApp extends App {
   val playerData = getPlayerData(data)
   val teamData = getTeamData(data)
 
-//  getAndPrint(pointsPerNinety())
-//  getAndPrint(overallDreamTeam())
-//  getAndPrint(playerFromName("Carrillo"))
-//  getAndPrint(mostWeeklyDreamTeam())
-//  getAndPrint(pointsPerNinety())
-//  getAndPrint(pointsPerMil())
-//  getAndPrint(playerByForm())
-//  getAndPrint(topPlayersFromTeam("Southampton"))
-//  getAndPrint(teamFromName("Southampton"))
-//  getAndPrint(getTeamsNextFixtureInfo("Southampton"))
+//  getAndPrintPlayers(pointsPerNinety())
+//  getAndPrintPlayers(overallDreamTeam())
+//  getAndPrintPlayers(playerFromName("Carrillo"))
+//  getAndPrintPlayers(mostWeeklyDreamTeam())
+//  getAndPrintPlayers(pointsPerNinety())
+//  getAndPrintPlayers(pointsPerMil())
+//  getAndPrintPlayers(playerByForm())
+//  getAndPrintPlayers(topPlayersFromTeam("Southampton"))
+//  printList(getTeamsNextFixtureInfo("Southampton"))
+//  printList(teamFromName("Southampton"))
+//  printList(allNextFixtures)
+  getAndPrintPlayers(topFormPlayersPredictedToWin)
 
 
+  def topFormPlayersPredictedToWin = {
+    val winningTeams = teamData.map(x => getTeamsNextFixtureInfo(x("name")).head)
+          .filter(_("expected_result") == "win")
+          .map(x => teamCodeFromName(x("name"))).toSet
+
+    playerByForm(playerData.filter(x => winningTeams.contains(x("team"))))
+  }
+
+  def allNextFixtures = {
+    teamData.filter(_("next_event_fixture.is_home") == "true")
+      .map(x => Map(x("name") -> {
+        teamData.filter(_("id") == x("next_event_fixture.opponent"))
+          .map(x => x("name")).head
+      }))
+  }
 
   def getTeamsNextFixtureInfo(teamName: String) = {
-    val neededKeys = Set("next_fixture_date", "next_event_fixture.opponent", "next_event_fixture.is_home", "strength_overall_home", "strength_overall_away")
+    val neededKeys = Set( "name",
+                          "next_fixture_date",
+                          "next_event_fixture.opponent",
+                          "next_event_fixture.is_home",
+                          "strength_overall_home",
+                          "strength_overall_away")
     teamFromName(teamName)
       .map(x => x ++ createDate(x))
       .map(y => y.filterKeys(neededKeys))
@@ -33,22 +55,28 @@ object FplApp extends App {
 
   def buildFixtureInfo(rawData: Map[String, String]): Map[String, String] = {
     val rawOpponent = teamData.filter(_("id") == rawData("next_event_fixture.opponent"))
-    val opponentName = rawOpponent.map(x => x("name"))
-    val homeBool = rawData("next_event_fixture.is_home").toBoolean
-    val homeOrAway = if(homeBool) "home" else "away"
-
+    val opponentName = rawOpponent.map(x => x("name")).head
+    val isHome = rawData("next_event_fixture.is_home").toBoolean
+    val homeOrAway = if(isHome) "home" else "away"
     val expectedResult = {
-      val teamStrength = rawData({ if(homeBool) "strength_overall_home" else "strength_overall_away" }).toInt
-      val opponentStrength = rawOpponent.head({ if(!homeBool) "strength_overall_home" else "strength_overall_away" }).toInt
+      val teamStrength = rawData({ if(isHome) "strength_overall_home" else "strength_overall_away" }).toInt
+      val opponentStrength = rawOpponent.head({
+        if(!isHome) "strength_overall_home"
+        else "strength_overall_away"
+      }).toInt
 
       teamStrength - opponentStrength match {
-        case x if x < 20 => "loss"
-        case y if y == 0 => "draw"
+        case x if x < -20 => "loss"
         case z if z > 20 => "win"
+        case _ => "draw"
       }
     }
 
-    Map("opponent" -> opponentName.head, "location" -> homeOrAway, "expected_result" -> expectedResult)
+    Map("name" -> rawData("name"),
+      "opponent" -> opponentName,
+      "next_fixture_date" -> rawData("next_fixture_date"),
+      "location" -> homeOrAway,
+      "expected_result" -> expectedResult)
   }
 
   def teamFromName(teamName: String) = {
@@ -64,7 +92,7 @@ object FplApp extends App {
     playerData.filter(_("web_name") == playerName)
   }
 
-  def playerByForm() = {
+  def playerByForm(playerData: List[Map[String, String]] = playerData) = {
     playerData
       .map(x => (x("web_name"), x("form")))
       .sortBy(_._2).reverse
@@ -126,7 +154,7 @@ object FplApp extends App {
     }
   }
 
-  def getAndPrint(f: List[_]) = {
+  def getAndPrintPlayers(f: List[_]) = {
     printList(f.take(11))
   }
 
