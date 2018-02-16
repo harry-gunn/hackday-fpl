@@ -2,6 +2,8 @@ import java.io.File
 
 import com.github.tototoshi.csv._
 
+import scala.annotation.tailrec
+
 object FplApp extends App {
 
   val data = readCsv("src/main/resources/result-json.csv")
